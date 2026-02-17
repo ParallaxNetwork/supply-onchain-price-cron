@@ -1,0 +1,41 @@
+{
+  "name": "price-cron",
+  "version": "1.0.0",
+  "description": "Express.js service with cron job and token validation",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "nodemon --exec ts-node src/index.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio"
+  },
+  "keywords": [
+    "express",
+    "cron",
+    "api",
+    "typescript",
+    "prisma"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^6.4.1",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "node-cron": "^3.0.3",
+    "puppeteer": "^24.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.6",
+    "@types/node-cron": "^3.0.11",
+    "nodemon": "^3.0.1",
+    "prisma": "^6.4.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3",
+    "zod": "^4.3.6",
+    "zod-prisma-types": "^3.3.11"
+  }
+}

@@ -1,0 +1,1107 @@
+generator client {
+  provider = "prisma-client-js"
+  seed     = "ts-node prisma/seed.ts"
+}
+
+generator zod {
+  provider           = "zod-prisma-types"
+  output             = "../src/server/schema/generated"
+  createPartialTypes = "true"
+  useMultipleFiles   = "true"
+  writeBarrelFiles   = "true"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Sack {
+  id          String         @id @default(uuid())
+  rfidTag     String         @unique
+  status      SackStatus     @default(PENDING)
+  printCount  Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  inventoryId String?
+  tokenId     String?
+  inventory   Inventory?     @relation(fields: [inventoryId], references: [id])
+  movements   SackMovement[]
+}
+
+model SackMovement {
+  id        String            @id @default(uuid())
+  sackId    String
+  gateId    String
+  direction MovementDirection
+  timestamp DateTime          @default(now())
+  sack      Sack              @relation(fields: [sackId], references: [id])
+}
+
+model Farmer {
+  id                        String                     @id @map("id")
+  /// @zod.string.email().min(1, { message: 'Email is required' })
+  email                     String                     @unique
+  /// @zod.string.min(1, { message: 'First name is required' })
+  firstName                 String
+  lastName                  String
+  publicAddress             String?                    @unique
+  oid                       String?
+  issuer                    String
+  phoneNumber               String?
+  estimatedYield            Float?
+  dob                       DateTime?
+  idcardNumber              String?
+  idcardImageUrl            String?
+  npwp                      String?
+  shelterId                 String?
+  isTesting                 Boolean                    @default(false)
+  /// @zod.number.min(0)
+  ccr                       Float?                     @default(0.0)
+  idrpUserUuid              String?
+  idrpKycStatus             IdrpKycStatus              @default(pending)
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  deletedAt                 DateTime?
+  shelter                   Shelter?                   @relation(fields: [shelterId], references: [id])
+  farmerOnCommodityInbounds FarmerOnCommodityInbound[]
+  nfcProfile                NfcProfile?
+  plantations               Plantation[]
+  ratings                   Rating[]                   @relation("FarmerRatings")
+  banks                     FarmerBank[]
+  ccrHistory                FarmerCCRHistory[]
+  withdrawRequests          WithdrawRequest[]
+}
+
+model Shelter {
+  id                  String              @id @default(uuid())
+  /// @zod.string.min(1, { message: 'Name is required' })
+  name                String
+  address             String?
+  email               String?             @unique
+  phoneNumber         String?
+  publicAddress       String?             @unique
+  oid                 String?
+  issuer              String
+  isTesting           Boolean             @default(false)
+  /// @zod.number.min(0)
+  ccr                 Float?              @default(0.0)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  deletedAt           DateTime?
+  ownerName           String?
+  ownerIdNumber       String?
+  ownerIdCardImageUrl String?
+  ownerDob            DateTime?
+  npwp                String?
+  nib                 String?
+  idrpUserUuid        String?
+  idrpKycStatus       IdrpKycStatus       @default(pending)
+  commodityInbounds   CommodityInbound[]
+  farmers             Farmer[]
+  nfcProfile          NfcProfile?
+  plantations         ShelterPlantation[]
+  banks               ShelterBank[]
+  ccrHistory          ShelterCCRHistory[]
+  withdrawRequests    WithdrawRequest[]
+}
+
+model Plantation {
+  id           String    @id @default(uuid())
+  /// @zod.string.min(1, { message: 'Name is required' })
+  name         String
+  address      String
+  /// @zod.string.min(1, { message: 'District is required' })
+  district     String
+  /// @zod.string.min(1, { message: 'City is required' })
+  city         String
+  /// @zod.string.min(1, { message: 'Province is required' })
+  province     String
+  village      String    @default("")
+  /// @zod.string.min(1, { message: 'Postal code is required' })
+  postalCode   String
+  latitude     Float
+  longitude    Float
+  sizeArea     Float
+  altitude     Float?
+  carbonCredit Float?
+  farmerId     String
+  tokenId      String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+  farmer       Farmer    @relation(fields: [farmerId], references: [id])
+}
+
+model ShelterPlantation {
+  id           String    @id @default(uuid())
+  name         String
+  address      String
+  /// @zod.string.min(1, { message: 'District is required' })
+  district     String
+  /// @zod.string.min(1, { message: 'City is required' })
+  city         String
+  /// @zod.string.min(1, { message: 'Province is required' })
+  province     String
+  village      String    @default("")
+  /// @zod.string.min(1, { message: 'Postal code is required' })
+  postalCode   String
+  latitude     Float
+  longitude    Float
+  sizeArea     Float
+  altitude     Float?
+  carbonCredit Float?
+  shelterId    String
+  tokenId      String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+  shelter      Shelter   @relation(fields: [shelterId], references: [id])
+}
+
+model NfcProfile {
+  id        String    @id @map("id")
+  shelterId String?   @unique
+  farmerId  String?   @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  farmer    Farmer?   @relation(fields: [farmerId], references: [id])
+  shelter   Shelter?  @relation(fields: [shelterId], references: [id])
+}
+
+model Warehouse {
+  id                String                @id @default(uuid())
+  subdomain         String                @unique
+  name              String
+  address           String
+  commodities       String[]
+  ccr               Float?                @default(0.0) /// @zod.number.min(0)
+  isTesting         Boolean               @default(false)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  deletedAt         DateTime?
+  iconId            String?               @unique
+  logoId            String?               @unique
+  commodityInbounds CommodityInbound[]
+  inventories       Inventory[]
+  icon              Document?             @relation("WarehouseIcon", fields: [iconId], references: [id])
+  logo              Document?             @relation("WarehouseLogo", fields: [logoId], references: [id])
+  admins            WarehouseAdmin[]
+  ccrHistory        WarehouseCCRHistory[]
+
+  owner             String
+  ownerEmail        String?
+  ownerPhone        String?
+  ownerIdCardNumber String?
+  ownerIdCardUrl    String?
+
+  nib               String?
+  npwp              String?
+  bankName          String?
+  bankAccountNumber String?
+  bankAccountName   String?
+  email             String?
+  phoneNumber       String?
+
+  warehouseStaffs WarehouseStaff[]
+}
+
+model WarehouseStaff {
+  id             String    @id @default(uuid())
+  warehouseId    String
+  name           String
+  phoneNumber    String
+  email          String?
+  idCardNumber   String
+  responsibility String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+  warehouse      Warehouse @relation(fields: [warehouseId], references: [id])
+}
+
+model Admin {
+  id           String           @id @default(uuid())
+  email        String           @unique
+  /// @zod.string.min(8, { message: "Password must be at least 8 characters" }).regex(/[a-z]/, { message: "Password must contain at least one lowercase letter" }).regex(/[A-Z]/, { message: "Password must contain at least one uppercase letter" }).regex(/[0-9]/, { message: "Password must contain at least one number" })
+  password     String
+  superAdmin   Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  fullname     String?
+  phoneNumber  String?
+  address      String?
+  deletedAt    DateTime?
+  firstLoginAt DateTime?
+  warehouses   WarehouseAdmin[]
+
+  MaDiscountSettingHistory MaDiscountSettingHistory[]
+}
+
+model WarehouseAdmin {
+  warehouseId String
+  adminId     String
+  role        String
+  createdAt   DateTime  @default(now())
+  admin       Admin     @relation(fields: [adminId], references: [id])
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+
+  @@id([warehouseId, adminId])
+}
+
+model Inventory {
+  id                    String       @id @default(uuid())
+  documentType          DocumentType
+  /// @zod.string.min(1, { message: 'Commodity name is required' })
+  commodity             String
+  /// @zod.string.min(1, { message: 'Commodity type is required' })
+  commodityType         String
+  /// @zod.number.min(0)
+  inbound               Float
+  /// @zod.number.min(0)
+  outbound              Float
+  /// @zod.number.min(0).int({ message: 'Sack count must be a whole number' })
+  sackCount             Int          @default(0)
+  /// @zod.string.min(1, { message: 'Grade is required' })
+  grade                 String
+  dateReceived          DateTime
+  dateStoredFrom        DateTime
+  dateStoredTo          DateTime
+  /// @zod.number.min(0)
+  handlingCharge        Float /** Price Total */
+  insurancePolicyNumber String?
+  insuranceValidFrom    DateTime?
+  insuranceValidTo      DateTime?
+  insuranceCompany      String?
+  insuredFor            String?
+  tokenId               String?
+  accountAddress        String?
+  sackManagerAddress    String?
+  warehouseId           String
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  deletedAt             DateTime?
+  insuranceCharge       Float? /** Price Total */
+  pusregFee             Float? /** Price Total */
+  storageFee            Float? /** Price Total */
+  warehouseFee          Float? /** Price Total */
+  insuranceDocumentId   String?      @unique
+  pricePerKg            Float? /// @zod.number.min(0)
+  costPerKg             Float? /** Price Kg */
+  needsFinancing        Boolean      @default(false)
+
+  vaultId String?
+
+  // Financial calculation fields for funding
+  fundingCost           Float?
+  fundingMargin         Float?
+  fundingIot            Float?
+  fundingSrgValue       Float?
+
+  insuranceDocument         Document?                   @relation("InsuranceDocument", fields: [insuranceDocumentId], references: [id])
+  warehouse                 Warehouse                   @relation(fields: [warehouseId], references: [id])
+  inventoryCommodityInbound InventoryCommodityInbound[]
+  inventoryDocument         InventoryDocument?
+  loanGuarantor             LoanGuarantor?
+  outboundStockItem         OutboundStockItem[]
+  testReport                Report?
+  sacks                     Sack[]
+  funding                   InventoryFunding?
+}
+
+model InventoryDocument {
+  id           String       @id @default(uuid())
+  inventoryId  String       @unique
+  number       String
+  documentType DocumentType
+  documentUrl  String
+
+  // CMA specific fields
+  issueDate     DateTime? // Tanggal Penerbitan Dokumen  
+  cmaDocumentId String?   @unique
+  cmaDocument   Document? @relation("CmaDocument", fields: [cmaDocumentId], references: [id]) // Dokumen CMA
+
+  // DG specific fields
+  dgDocumentId String?   @unique
+  dgDocument   Document? @relation("DgDocument", fields: [dgDocumentId], references: [id]) // Dokumen DG
+
+  // SRG specific fields (nullable for CMA/DG)
+  serialNumber      String?
+  approvalNumber    String?
+  securityCode      String?
+  certificateOrigin String?
+  certificateNumber String?
+  receiptType       InventoryDocumentReceiptType?
+  certificateDate   DateTime?
+  agreementNumber   String?
+  agreementDate     DateTime?
+
+  // Blockchain
+  tokenId String?
+  txHash  String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  inventory      Inventory                @relation(fields: [inventoryId], references: [id])
+  parties        InventoryDocumentParty[]
+  additionalDocs Document[]               @relation("InventoryDocAdditionalDocs")
+}
+
+model InventoryDocumentParty {
+  id                  String    @id @default(uuid())
+  inventoryDocumentId String
+  partyType           PartyType
+  institutionName     String // Nama Instansi
+  officeAddress       String // Alamat Kantor
+  representativeName  String // Nama Perwakilan
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  inventoryDocument InventoryDocument @relation(fields: [inventoryDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([inventoryDocumentId])
+}
+
+model LoanGuarantor {
+  id               String    @id @default(uuid())
+  inventoryId      String    @unique
+  guarantorType    String
+  guarantorName    String
+  guarantorAddress String
+  guarantorPhone   String
+  guarantorEmail   String
+  guarantorId      String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+  inventory        Inventory @relation(fields: [inventoryId], references: [id])
+}
+
+model Report {
+  id                   String         @id @default(uuid())
+  inventoryId          String         @unique
+  number               String
+  orderNumber          String
+  commodity            String
+  sampleIdentification String
+  sampleOrigin         String
+  sampleProcess        String
+  packingType          String
+  receivedDate         DateTime
+  tokenId              String?
+  gradeDetail          Json
+  fileUrl              String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  deletedAt            DateTime?
+  testingCharge        Float          @default(0.0) /** Price total */
+  document             Document[]     @relation("ReportDocuments")
+  inventory            Inventory      @relation(fields: [inventoryId], references: [id])
+  testReportDetail     ReportDetail[]
+}
+
+model ReportDetail {
+  id                 String    @id @default(uuid())
+  testReportId       String
+  testParameter      String
+  reportValue        String
+  qualityRequirement String
+  analysisMethod     String
+  specialRequirement Boolean
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+  testReport         Report    @relation(fields: [testReportId], references: [id])
+}
+
+model OutboundStock {
+  id              String @id @default(uuid())
+  /// @zod.string.min(1, { message: 'Commodity type is required' })
+  commodityType   String
+  /// @zod.number.min(1, { message: 'Quantity ordered must be greater than zero' })
+  quantityOrdered Float
+  /// @zod.number.min(0, { message: 'Total price must be valid' })
+  totalPrice      Float
+  /// @zod.number.min(0, { message: 'Price per kg must be valid' })
+  pricePerKg      Float
+
+  /// @zod.string.min(1, { message: 'Client name is required' })
+  clientName          String?
+  /// @zod.string.min(1, { message: 'Client phone number is required' })
+  clientPhoneNumber   String?
+  /// @zod.string.min(1, { message: 'Client address is required' })
+  clientAddress       String?
+  /// @zod.string.min(1, { message: 'Client location is required' })
+  clientCountry       String?
+  clientType          OutboundStockClientType?
+  clientEmail         String?
+  clientTaxNumber     String?
+  clientPublicAddress String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  status    OutboundStatus      @default(PENDING)
+  documents Document[]          @relation("OutboundDocuments")
+  items     OutboundStockItem[]
+
+  outboundStockShipment OutboundStockShipment? @relation("OutboundStockShipment")
+}
+
+model OutboundStockItem {
+  id              String        @id @default(uuid())
+  outboundStockId String
+  inventoryId     String
+  /// @zod.number.min(0, { message: 'Quantity taken must be valid' })
+  quantityTaken   Float
+  createdAt       DateTime      @default(now())
+  inventory       Inventory     @relation(fields: [inventoryId], references: [id])
+  outboundStock   OutboundStock @relation(fields: [outboundStockId], references: [id])
+}
+
+model OutboundStockShipment {
+  id String @id @default(uuid())
+
+  outboundStockId String        @unique
+  outboundStock   OutboundStock @relation("OutboundStockShipment", fields: [outboundStockId], references: [id])
+
+  shipmentDate             DateTime?
+  shipmentEstimatedArrival DateTime?
+  shipmentMethod           OutboundStockShipmentMethod?
+
+  /// @zod.string.min(1, { message: 'PIC name is required' })
+  picName         String?
+  /// @zod.string.min(1, { message: 'PIC phone number is required' })
+  picPhoneNumber  String?
+  /// @zod.string.min(1, { message: 'PIC ID Card number is required' })
+  picIdCardNumber String?
+  /// @zod.string.min(1, { message: 'PIC ID card is required' })
+  picIdCardId     String?   @unique
+  picIdCard       Document? @relation("outboundStockPicIdCard", fields: [picIdCardId], references: [id])
+  picAddress      String?
+
+  /// @zod.string.min(1, { message: 'Receiver name is required' })
+  receiverName        String?
+  /// @zod.string.min(1, { message: 'Receiver phone number is required' })
+  receiverPhoneNumber String?
+  /// @zod.string.min(1, { message: 'Receiver address is required' })
+  receiverAddress     String?
+
+  shipmentVehicles ShipmentVehicle[]
+  documents        Document[]        @relation("OutboundStockShipmentDocuments")
+
+  // Delivery Confirmation Fields (Step 3)
+  actualArrivalDate   DateTime?
+  deliveryReceivedBy  String?
+  deliveryConfirmedAt DateTime?
+
+  bastDocumentId String?    @unique
+  bastDocument   Document?  @relation("OutboundStockBastDocument", fields: [bastDocumentId], references: [id])
+  deliveryPhotos Document[] @relation("OutboundStockDeliveryPhotos")
+}
+
+model ShipmentVehicle {
+  id String @id @default(uuid())
+
+  outboundStockShipmentId String
+  outboundStockShipment   OutboundStockShipment @relation(fields: [outboundStockShipmentId], references: [id])
+
+  /// @zod.string.min(1, { message: 'Vehicle type is required' })
+  vehicleType        String?
+  /// @zod.string.min(1, { message: 'Vehicle plate number is required' })
+  vehiclePlateNumber String?
+
+  /// @zod.string.min(1, { message: 'Driver name is required' })
+  driverName        String?
+  /// @zod.string.min(1, { message: 'Driver phone number is required' })
+  driverPhoneNumber String?
+}
+
+model CommodityInbound {
+  id                        String                      @id @default(uuid())
+  parentCommodityId         String?
+  documentType              DocumentType?
+  commodityType             String
+  commodityName             String
+  dateReceived              DateTime
+  quantity                  Float
+  quality                   Json?
+  reason                    String?
+  shelterId                 String?
+  handoverNumber            String?
+  handoverDate              DateTime?
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime                    @updatedAt
+  deletedAt                 DateTime?
+  warehouseId               String?
+  isWaste                   Boolean                     @default(false)
+  stage                     Stage
+  commodityInboundNumber    String
+  commodityBuyout           CommodityBuyout?
+  parentCommodity           CommodityInbound?           @relation("SelfReference", fields: [parentCommodityId], references: [id])
+  childCommodity            CommodityInbound[]          @relation("SelfReference")
+  shelter                   Shelter?                    @relation(fields: [shelterId], references: [id])
+  warehouse                 Warehouse?                  @relation(fields: [warehouseId], references: [id])
+  documents                 Document[]                  @relation("InboundDocuments")
+  farmers                   FarmerOnCommodityInbound[]
+  inventoryCommodityInbound InventoryCommodityInbound[]
+  commodityShelterPriceId   String?
+  commodityShelterPrice     CommodityShelterPrice?      @relation(fields: [commodityShelterPriceId], references: [id])
+}
+
+model FarmerOnCommodityInbound {
+  id                 String           @id @default(uuid())
+  farmerId           String
+  commodityInboundId String
+  quantity           Float?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  commodityInbound   CommodityInbound @relation(fields: [commodityInboundId], references: [id])
+  farmer             Farmer           @relation(fields: [farmerId], references: [id])
+}
+
+model CommodityBuyout {
+  id                 String           @id @default(uuid())
+  commodityInboundId String           @unique
+  price              Float /** Price KG */
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  deletedAt          DateTime?
+  commodityInbound   CommodityInbound @relation(fields: [commodityInboundId], references: [id])
+}
+
+model CommodityShelterPrice {
+  id                String             @id @default(uuid())
+  price             Float /** Price KG */
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
+  commodityInbounds CommodityInbound[]
+}
+
+model Document {
+  id        String    @id @default(uuid())
+  label     String
+  name      String
+  path      String
+  type      String
+  note      String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  commodityInboundId String?
+  commodityInbound   CommodityInbound? @relation("InboundDocuments", fields: [commodityInboundId], references: [id], onDelete: Cascade, map: "inboundId")
+
+  outboundStockId String?
+  outboundStock   OutboundStock? @relation("OutboundDocuments", fields: [outboundStockId], references: [id], onDelete: Cascade, map: "outboundId")
+
+  reportId String?
+  report   Report? @relation("ReportDocuments", fields: [reportId], references: [id], onDelete: Cascade, map: "reportId")
+
+  inventoryDocumentId String?
+  inventoryDocument   InventoryDocument? @relation("InventoryDocAdditionalDocs", fields: [inventoryDocumentId], references: [id], onDelete: Cascade, map: "inventoryDocId")
+
+  outboundStockShipmentId String?
+  outboundStockShipment   OutboundStockShipment? @relation("OutboundStockShipmentDocuments", fields: [outboundStockShipmentId], references: [id], onDelete: Cascade)
+
+  insurance                 Inventory?             @relation("InsuranceDocument")
+  cmaDocument               InventoryDocument?     @relation("CmaDocument")
+  dgDocument                InventoryDocument?     @relation("DgDocument")
+  iconOf                    Warehouse?             @relation("WarehouseIcon")
+  logoOf                    Warehouse?             @relation("WarehouseLogo")
+  outboundStockPicIdCard    OutboundStockShipment? @relation("outboundStockPicIdCard")
+  outboundStockBastDocument OutboundStockShipment? @relation("OutboundStockBastDocument")
+
+  deliveryPhotoShipmentId String?
+  deliveryPhotoShipment   OutboundStockShipment? @relation("OutboundStockDeliveryPhotos", fields: [deliveryPhotoShipmentId], references: [id], onDelete: Cascade)
+
+  @@index([commodityInboundId])
+  @@index([outboundStockId])
+  @@index([reportId])
+  @@index([inventoryDocumentId])
+  @@index([outboundStockShipmentId])
+  @@index([deliveryPhotoShipmentId])
+}
+
+model Rating {
+  id          String    @id @default(uuid())
+  /// @zod.number.min(1).max(5)
+  rating      Int
+  comment     String?
+  relatedType String
+  relatedId   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  farmer      Farmer    @relation("FarmerRatings", fields: [relatedId], references: [id], onDelete: Cascade)
+
+  @@index([relatedType, relatedId])
+}
+
+model InventoryCommodityInbound {
+  id                 String           @id @default(uuid())
+  inventoryId        String
+  commodityInboundId String
+  commodityInbound   CommodityInbound @relation(fields: [commodityInboundId], references: [id], onDelete: Cascade)
+  inventory          Inventory        @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  quantity           Float?
+}
+
+model Bank {
+  id        String    @id @default(uuid())
+  /// @zod.string.min(1, { message: 'Bank name is required' })
+  name      String // Bank name (e.g., "Bank Mandiri", "BCA", "BRI")
+  /// @zod.string.min(1, { message: 'Bank code is required' })
+  code      String    @unique // Bank code for transfers (e.g., "008" for Mandiri, "014" for BCA)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  farmers  FarmerBank[]
+  shelters ShelterBank[]
+}
+
+model FarmerBank {
+  id            String    @id @default(uuid())
+  farmerId      String
+  bankId        String
+  /// @zod.string.min(1, { message: 'Account number is required' })
+  accountNumber String
+  /// @zod.string.min(1, { message: 'Account holder name is required' })
+  accountName   String // Account holder name
+  isPrimary     Boolean   @default(false) // Mark primary bank account
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  farmer Farmer @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  bank   Bank   @relation(fields: [bankId], references: [id])
+
+  @@unique([farmerId, bankId, accountNumber]) // Prevent duplicate entries
+  @@index([farmerId])
+}
+
+model ShelterBank {
+  id            String    @id @default(uuid())
+  shelterId     String
+  bankId        String
+  /// @zod.string.min(1, { message: 'Account number is required' })
+  accountNumber String
+  /// @zod.string.min(1, { message: 'Account holder name is required' })
+  accountName   String // Account holder name
+  isPrimary     Boolean   @default(false) // Mark primary bank account
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  shelter Shelter @relation(fields: [shelterId], references: [id], onDelete: Cascade)
+  bank    Bank    @relation(fields: [bankId], references: [id])
+
+  @@unique([shelterId, bankId, accountNumber]) // Prevent duplicate entries
+  @@index([shelterId])
+}
+
+model WarehouseCCRHistory {
+  id             String   @id @default(uuid())
+  warehouseId    String
+  idrMa30Arabica Float
+  idrMa30Robusta Float
+  /// @zod.number.min(0)
+  stockArabica   Float?
+  stockRobusta   Float?
+  loanTotal      Float?
+  ccr            Float // The CCR value at this point in time (minimum 140% typically required)
+  reason         String? // Why it changed (e.g., "Performance review", "Default incident")
+  changedBy      String? // Admin ID or name who made the change
+  createdAt      DateTime @default(now())
+
+  warehouse Warehouse                  @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  grades    WarehouseCCRHistoryGrade[]
+
+  @@index([warehouseId, createdAt])
+}
+
+model WarehouseCCRHistoryGrade {
+  id           String         @id @default(uuid())
+  ccrHistoryId String
+  commodity    MarketDataType
+  grade        Stage
+  stock        Float          @default(0)
+  idrMa30Price Float          @default(0)
+
+  ccrHistory WarehouseCCRHistory @relation(fields: [ccrHistoryId], references: [id], onDelete: Cascade)
+
+  @@unique([ccrHistoryId, commodity, grade])
+  @@index([ccrHistoryId])
+}
+
+model InventoryFunding {
+  id                   String        @id @default(uuid())
+  inventoryId          String        @unique
+  cost                 Float
+  margin               Float
+  iot                  Float
+  srgValue             Float
+  fundingTarget        Float
+  currentFundingAmount Float         @default(0)
+  ltv                  Float         @default(0.7)
+  status               FundingStatus @default(DEFAULTED)
+  fundingStartDate     DateTime      @default(now())
+  fundingEndDate       DateTime?
+  campaignId           Float?
+  slotIds              String[]      @default([]) // For onchain funding, multiple investor tokenIds
+  borrowerSignedOff    Boolean       @default(false)
+  borrowerSignedOffAt  DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  inventory    Inventory            @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  transactions FundingTransaction[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model FundingTransaction {
+  id                 String                 @id @default(uuid())
+  inventoryFundingId String
+  /// @zod.number.min(0)
+  amount             Float
+  transactionType    FundingTransactionType
+  source             String? // Investor name, institution, etc.
+  reference          String? // Transaction reference number
+  notes              String?
+  createdAt          DateTime               @default(now())
+  createdBy          String? // Admin ID who recorded it
+
+  inventoryFunding InventoryFunding @relation(fields: [inventoryFundingId], references: [id], onDelete: Cascade)
+
+  @@index([inventoryFundingId, createdAt])
+}
+
+model MarketData {
+  id              Int               @id @default(autoincrement())
+  type            MarketDataType
+  tradeDate       DateTime
+  openPrice       Decimal           @default(0) @db.Decimal(10, 2)
+  highPrice       Decimal           @default(0) @db.Decimal(10, 2)
+  lowPrice        Decimal           @default(0) @db.Decimal(10, 2)
+  closePrice      Decimal           @default(0) @db.Decimal(10, 2)
+  priceChange     Decimal           @default(0) @db.Decimal(10, 2)
+  previousClose   Decimal           @default(0) @db.Decimal(10, 2)
+  changePercent   Decimal?          @default(0) @db.Decimal(5, 2)
+  ma30            Decimal?          @default(0) @db.Decimal(10, 2)
+  ma30Change      Decimal?          @default(0) @db.Decimal(10, 2)
+  unitLabel       String
+  volume          Int
+  openInterest    Int
+  idrPrice        Decimal           @default(0) @db.Decimal(10, 2)
+  idrMa30         Decimal           @default(0) @db.Decimal(10, 2)
+  idrMa30Change   Decimal           @default(0) @db.Decimal(10, 2)
+  idrPriceChange  Decimal           @default(0) @db.Decimal(10, 2)
+  idrRate         Decimal           @default(0) @db.Decimal(10, 2)
+  MaDiscountValue MaDiscountValue[]
+
+  // Constraints & Index
+  @@unique([type, tradeDate])
+  @@index([tradeDate])
+}
+
+model FarmerCCRHistory {
+  id             String   @id @default(uuid())
+  farmerId       String
+  idrMa30Arabica Float
+  idrMa30Robusta Float
+  /// @zod.number.min(0)
+  stockArabica   Float?
+  stockRobusta   Float?
+  loanTotal      Float?
+  ccr            Float // The CCR value at this point in time (ratio, not percentage)
+  reason         String? // Why it changed (e.g., "MA30 price update", "New commodity received")
+  changedBy      String? // Admin ID or name who made the change
+  createdAt      DateTime @default(now())
+
+  farmer Farmer                  @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  grades FarmerCCRHistoryGrade[]
+
+  @@index([farmerId, createdAt])
+}
+
+model FarmerCCRHistoryGrade {
+  id           String         @id @default(uuid())
+  ccrHistoryId String
+  commodity    MarketDataType
+  grade        Stage
+  stock        Float          @default(0)
+  idrMa30Price Float          @default(0)
+
+  ccrHistory FarmerCCRHistory @relation(fields: [ccrHistoryId], references: [id], onDelete: Cascade)
+
+  @@unique([ccrHistoryId, commodity, grade])
+  @@index([ccrHistoryId])
+}
+
+model ShelterCCRHistory {
+  id             String   @id @default(uuid())
+  shelterId      String
+  idrMa30Arabica Float
+  idrMa30Robusta Float
+  /// @zod.number.min(0)
+  stockArabica   Float?
+  stockRobusta   Float?
+  loanTotal      Float?
+  ccr            Float // The CCR value at this point in time (ratio, not percentage)
+  reason         String? // Why it changed (e.g., "MA30 price update", "New commodity received")
+  changedBy      String? // Admin ID or name who made the change
+  createdAt      DateTime @default(now())
+
+  shelter Shelter                  @relation(fields: [shelterId], references: [id], onDelete: Cascade)
+  grades  ShelterCCRHistoryGrade[]
+
+  @@index([shelterId, createdAt])
+}
+
+model ShelterCCRHistoryGrade {
+  id           String         @id @default(uuid())
+  ccrHistoryId String
+  commodity    MarketDataType
+  grade        Stage
+  stock        Float          @default(0)
+  idrMa30Price Float          @default(0)
+
+  ccrHistory ShelterCCRHistory @relation(fields: [ccrHistoryId], references: [id], onDelete: Cascade)
+
+  @@unique([ccrHistoryId, commodity, grade])
+  @@index([ccrHistoryId])
+}
+
+model MaDiscountSetting {
+  id              String                     @id @default(uuid())
+  commodity       MarketDataType
+  type            Stage
+  discount        Float
+  history         MaDiscountSettingHistory[]
+  MaDiscountValue MaDiscountValue[]
+}
+
+model MaDiscountSettingHistory {
+  id                  String            @id @default(uuid())
+  maDiscountSettingId String
+  from                Float
+  to                  Float
+  updatedBy           String
+  createdAt           DateTime          @default(now())
+  updateAdmin         Admin             @relation(fields: [updatedBy], references: [id], onDelete: Cascade)
+  maDiscountSetting   MaDiscountSetting @relation(fields: [maDiscountSettingId], references: [id], onDelete: Cascade)
+}
+
+model MaDiscountValue {
+  id                        String            @id @default(uuid())
+  type                      Stage
+  discountedMa30            Float
+  discountedIdrMa30         Float
+  discountPercentage        Float
+  discountedMa30Movement    Float             @default(0)
+  discountedIdrMa30Movement Float             @default(0)
+  marketDataID              Int
+  marketData                MarketData        @relation(fields: [marketDataID], references: [id], onDelete: Cascade)
+  maDiscountSettingId       String
+  maDiscountSetting         MaDiscountSetting @relation(fields: [maDiscountSettingId], references: [id], onDelete: Cascade)
+  createdAt                 DateTime          @default(now())
+
+  @@unique([marketDataID, maDiscountSettingId])
+  @@index([marketDataID, maDiscountSettingId])
+}
+
+model ChangeLog {
+  id         String   @id @default(uuid())
+  tableName  String
+  relationId String
+  oldData    String   @db.Text
+  newData    String   @db.Text
+  updatedBy  String?
+  createdAt  DateTime @default(now())
+
+  @@index([tableName, relationId])
+  @@index([createdAt])
+}
+
+enum SackStatus {
+  PENDING // Default initial state
+  IN // Sack is in the warehouse (scanned IN by RFID gate)
+  OUT // Sack is out of the warehouse (scanned OUT by RFID gate)
+}
+
+enum MovementDirection {
+  IN
+  OUT
+}
+
+enum Stage {
+  CHERRY
+  WASHED
+  DRIED
+  UNGRADED
+  GRADE_1
+  GRADE_2
+  GRADE_3
+  GRADE_4A
+  GRADE_4B
+}
+
+enum OutboundStatus {
+  DRAFT
+  PENDING
+  SHIPPED
+  COMPLETED
+  CANCELLED
+}
+
+enum DocumentType {
+  SRG
+  CMA
+  DG
+  BO
+}
+
+enum InventoryDocumentReceiptType {
+  ON_BEHALF
+  BY_ORDER
+}
+
+enum PartyType {
+  FUNDER // Pihak 1 - Pendana
+  DEPOSITOR // Pihak 2 - Depositor
+  COLLATERAL_MANAGER // Pihak 3 - Pengelola Jaminan
+}
+
+enum FundingStatus {
+  OPEN // Accepting funding
+  IN_PROGRESS // Partially funded
+  COMPLETED // Fully funded / Awaiting repayment
+  SETTLED // Loan fully repaid
+  CANCELLED // Funding cancelled
+  DEFAULTED // Loan defaulted
+}
+
+enum FundingTransactionType {
+  INITIAL // Initial funding
+  ADDITIONAL // Additional funding contribution
+  REFUND // Refund/withdrawal
+  ADJUSTMENT // Manual adjustment
+}
+
+enum MarketDataType {
+  ARABICA
+  ROBUSTA
+}
+
+model WithdrawRequest {
+  id String @id @default(cuid())
+
+  // Actor type - who is making the withdrawal
+  actorType     WithdrawActor
+  farmerId      String?
+  shelterId     String?
+  walletAddress String
+
+  // Amount in IDRP (human readable, e.g., 100000 = Rp100,000)
+  amount Float
+
+  // Bank details for fiat withdrawal
+  bankName      String
+  accountNumber String
+  accountHolder String
+
+  // Current step and overall status
+  currentStep WithdrawStep   @default(CREATED)
+  status      WithdrawStatus @default(PENDING)
+
+  // Step 1: Permit (EIP-2612 signature)
+  permitSignature   String?   @db.Text
+  permitDeadline    BigInt?
+  permitNonce       BigInt?
+  permitTxHash      String?
+  permitGasUsed     String?
+  permitError       String?   @db.Text
+  permitCompletedAt DateTime?
+
+  // Step 2: Transfer (transferFrom to IDRP Controller)
+  transferTxHash      String?
+  transferGasUsed     String?
+  transferError       String?   @db.Text
+  transferCompletedAt DateTime?
+
+  // Step 3: Submit to IDRP (indirect burn request)
+  idrpRequestId     Int?
+  submitError       String?   @db.Text
+  submitCompletedAt DateTime?
+
+  // Metadata
+  chainId   Int      @default(84532)
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations (one of these will be set based on actorType)
+  farmer  Farmer?  @relation(fields: [farmerId], references: [id])
+  shelter Shelter? @relation(fields: [shelterId], references: [id])
+
+  @@index([farmerId])
+  @@index([shelterId])
+  @@index([actorType])
+  @@index([status])
+  @@index([currentStep])
+  @@index([walletAddress])
+}
+
+enum WithdrawActor {
+  FARMER
+  SHELTER
+}
+
+enum WithdrawStep {
+  CREATED // Initial request created, waiting to start
+  PERMIT_PENDING // Waiting for user to sign permit
+  PERMIT_COMPLETED // Permit executed on-chain
+  TRANSFER_PENDING // Waiting for transfer execution
+  TRANSFER_COMPLETED // Transfer executed on-chain
+  SUBMIT_PENDING // Submitting to IDRP backend
+  COMPLETED // Successfully submitted to IDRP
+  FAILED // Any step failed
+}
+
+enum WithdrawStatus {
+  PENDING // Not started or in progress
+  PROCESSING // Currently being processed
+  COMPLETED // Successfully completed
+  FAILED // Failed at some step
+  CANCELLED // Cancelled by user
+}
+
+enum OutboundStockClientType {
+  DOMESTIC
+  EXPORT
+}
+
+enum IdrpKycStatus {
+  pending
+  success
+}
+
+enum OutboundStockShipmentMethod {
+  ROAD_FREIGHT_TRUCK
+  SEA_FREIGHT_CONTAINER
+  SEA_FREIGHT_BULK
+  AIR_FREIGHT_AIRPLANE
+  RAIL_FREIGHT_TRAIN
+}
