@@ -206,8 +206,10 @@ export class PriceIndexService {
       const ma30 = Number(marketData.ma30);
       const idrMa30 = Number(marketData.idrMa30);
 
-      const discountedMa30 = ma30 - (ma30 * setting.discount) / 100;
-      const discountedIdrMa30 = idrMa30 - (idrMa30 * setting.discount) / 100;
+      // Positive discount = adjustment/extra (add to price)
+      // Negative discount = discount (subtract from price)
+      const discountedMa30 = ma30 + (ma30 * setting.discount) / 100;
+      const discountedIdrMa30 = idrMa30 + (idrMa30 * setting.discount) / 100;
 
       // Calculate movement
       let discountedMa30Movement = 0;
