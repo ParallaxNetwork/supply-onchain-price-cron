@@ -10,6 +10,8 @@ const PORT = process.env.PORT || 3000;
 const CRON_TOKEN = process.env.CRON_TOKEN || 'default-secret-token';
 const CRON_SCHEDULE = process.env.CRON_SCHEDULE || '0 3 * * *';
 const CRON_TIMEZONE = process.env.CRON_TIMEZONE || 'Asia/Bangkok';
+const MAX_RETRIES = 5;
+const RETRY_DELAY_MS = 2000;
 
 app.use(express.json());
 
@@ -100,21 +102,60 @@ app.post('/scrape/kc', async (req: Request, res: Response) => {
   }
 });
 
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  taskName: string,
+  maxRetries: number = MAX_RETRIES
+): Promise<T> {
+  let lastError: Error | unknown;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[${taskName}] Attempt ${attempt}/${maxRetries}`);
+      const result = await fn();
+      if (attempt > 1) {
+        console.log(`[${taskName}] ✅ Succeeded on attempt ${attempt}`);
+      }
+      return result;
+    } catch (error) {
+      lastError = error;
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`[${taskName}] ❌ Attempt ${attempt}/${maxRetries} failed: ${errorMsg}`);
+      
+      if (attempt < maxRetries) {
+        const delay = RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+        console.log(`[${taskName}] ⏳ Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw new Error(
+    `[${taskName}] Failed after ${maxRetries} attempts. Last error: ${lastError instanceof Error ? lastError.message : 'Unknown error'}`
+  );
+}
+
 async function performCronTask(): Promise<void> {
   console.log('Executing cron task...');
 
   const service = new PriceIndexService();
 
   try {
-    await service.scrapeRm();
+    await retryWithBackoff(
+      () => service.scrapeRm(),
+      'scrapeRm'
+    );
   } catch (error) {
-    console.error('scrapeRm failed:', error);
+    console.error('scrapeRm failed after all retries:', error);
   }
 
   try {
-    await service.scrapeKC();
+    await retryWithBackoff(
+      () => service.scrapeKC(),
+      'scrapeKC'
+    );
   } catch (error) {
-    console.error('scrapeKC failed:', error);
+    console.error('scrapeKC failed after all retries:', error);
   }
 }
 

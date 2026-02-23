@@ -1,6 +1,11 @@
 import puppeteer from "puppeteer";
 import { db } from "../server/db";
 import type { MarketData } from "@prisma/client";
+import {
+  updateAllFarmerCCR,
+  updateAllShelterCCR,
+  updateAllWarehouseCCR,
+} from "./ccr";
 
 /* ---------------------------------------
    CONSTANTS
@@ -361,6 +366,19 @@ export class PriceIndexService {
 
     await this._generateDiscountValues(marketData);
 
+    console.log('🔄 Updating CCR for all entities after KC price update...');
+    try {
+      await Promise.all([
+        updateAllFarmerCCR(),
+        updateAllShelterCCR(),
+        updateAllWarehouseCCR(),
+      ]);
+      console.log('✅ CCR updated successfully for all entities');
+    } catch (error) {
+      console.error('❌ Error updating CCR:', error);
+      // Don't throw - allow the scrape to be considered successful even if CCR update fails
+    }
+
     return 0;
   }
 
@@ -466,6 +484,19 @@ export class PriceIndexService {
     });
 
     await this._generateDiscountValues(marketData);
+
+    console.log('🔄 Updating CCR for all entities after RM price update...');
+    try {
+      await Promise.all([
+        updateAllFarmerCCR(),
+        updateAllShelterCCR(),
+        updateAllWarehouseCCR(),
+      ]);
+      console.log('✅ CCR updated successfully for all entities');
+    } catch (error) {
+      console.error('❌ Error updating CCR:', error);
+      // Don't throw - allow the scrape to be considered successful even if CCR update fails
+    }
 
     return 0;
   }

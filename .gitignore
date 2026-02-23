@@ -4,3 +4,4 @@ node_modules/
 dist/
 *.tsbuildinfo
 /src/server/schema/generated/
+.idea
