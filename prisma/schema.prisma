@@ -308,7 +308,7 @@ model Inventory {
   dateStoredFrom        DateTime
   dateStoredTo          DateTime
   /// @zod.number.min(0)
-  handlingCharge        Float /** Price Total */
+  handlingCharge        Float
   insurancePolicyNumber String?
   insuranceValidFrom    DateTime?
   insuranceValidTo      DateTime?
@@ -321,13 +321,13 @@ model Inventory {
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
   deletedAt             DateTime?
-  insuranceCharge       Float? /** Price Total */
-  pusregFee             Float? /** Price Total */
-  storageFee            Float? /** Price Total */
-  warehouseFee          Float? /** Price Total */
+  insuranceCharge       Float?
+  pusregFee             Float?
+  storageFee            Float?
+  warehouseFee          Float?
   insuranceDocumentId   String?      @unique
   pricePerKg            Float? /// @zod.number.min(0)
-  costPerKg             Float? /** Price Kg */
+  costPerKg             Float?
   needsFinancing        Boolean      @default(false)
 
   vaultId String?
@@ -437,7 +437,7 @@ model Report {
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
   deletedAt            DateTime?
-  testingCharge        Float          @default(0.0) /** Price total */
+  testingCharge        Float          @default(0.0)
   document             Document[]     @relation("ReportDocuments")
   inventory            Inventory      @relation(fields: [inventoryId], references: [id])
   testReportDetail     ReportDetail[]
@@ -607,7 +607,7 @@ model FarmerOnCommodityInbound {
 model CommodityBuyout {
   id                 String           @id @default(uuid())
   commodityInboundId String           @unique
-  price              Float /** Price KG */
+  price              Float
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
   deletedAt          DateTime?
@@ -616,7 +616,7 @@ model CommodityBuyout {
 
 model CommodityShelterPrice {
   id                String             @id @default(uuid())
-  price             Float /** Price KG */
+  price             Float
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   deletedAt         DateTime?
