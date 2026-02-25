@@ -895,10 +895,17 @@ export async function updateAllFarmerCCR() {
         });
 
         // Update warehouse CCR
-        await tx.farmer.update({
+        const updateResult = await tx.farmer.updateMany({
           where: { id: farmerId },
           data: { ccr },
         });
+
+        if (updateResult.count === 0) {
+          console.warn(
+            `Skipping CCR history for farmer ${farmerId}: farmer record not found`,
+          );
+          continue;
+        }
 
         // Create CCR history record with grade data
         const gradeData = prepareGradeData(stocks, prices);

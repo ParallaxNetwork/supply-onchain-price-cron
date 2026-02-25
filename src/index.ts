@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import cron from 'node-cron';
+import fs from 'fs';
+import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { PriceIndexService } from './lib/price-index';
 
@@ -10,10 +12,31 @@ const PORT = process.env.PORT || 3000;
 const CRON_TOKEN = process.env.CRON_TOKEN || 'default-secret-token';
 const CRON_SCHEDULE = process.env.CRON_SCHEDULE || '0 3 * * *';
 const CRON_TIMEZONE = process.env.CRON_TIMEZONE || 'Asia/Bangkok';
+const CRON_ENABLED = process.env.CRON_ENABLED !== 'false';
+const LOG_DIR = process.env.LOG_DIR || 'logs';
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 2000;
 
 app.use(express.json());
+
+function log(message: string, meta?: Record<string, unknown>) {
+  const timestamp = new Date().toISOString();
+  const line = meta
+    ? `[${timestamp}] ${message} ${JSON.stringify(meta)}`
+    : `[${timestamp}] ${message}`;
+
+  console.log(line);
+
+  try {
+    const dir = path.resolve(process.cwd(), LOG_DIR);
+    fs.mkdirSync(dir, { recursive: true });
+    const date = timestamp.slice(0, 10);
+    const logfile = path.join(dir, `app-${date}.log`);
+    fs.appendFileSync(logfile, `${line}\n`, { encoding: 'utf8' });
+  } catch (error) {
+    console.error('Failed to write log file:', error);
+  }
+}
 
 function requireBearerToken(req: Request, res: Response): boolean {
   const token = req.headers['authorization'];
@@ -37,10 +60,10 @@ app.post('/cron', async (req: Request, res: Response) => {
   if (!requireBearerToken(req, res)) return;
 
   try {
-    console.log(`[${new Date().toISOString()}] Cron job triggered via POST request`);
-    
+    log('Cron job triggered via POST request');
+
     await performCronTask();
-    
+
     res.json({ 
       success: true, 
       message: 'Cron job executed successfully',
@@ -135,8 +158,10 @@ async function retryWithBackoff<T>(
   );
 }
 
+let isCronRunning = false;
+
 async function performCronTask(): Promise<void> {
-  console.log('Executing cron task...');
+  log('Executing cron task...');
 
   const service = new PriceIndexService();
 
@@ -159,21 +184,60 @@ async function performCronTask(): Promise<void> {
   }
 }
 
-cron.schedule(CRON_SCHEDULE, async () => {
-  console.log(`[${new Date().toISOString()}] Scheduled cron job triggered`);
-  try {
-    await performCronTask();
-  } catch (error) {
-    console.error('Error in scheduled cron job:', error);
-  }
-}, { timezone: CRON_TIMEZONE });
+if (!cron.validate(CRON_SCHEDULE)) {
+  log('Invalid CRON_SCHEDULE - cron will not be scheduled', {
+    cronSchedule: CRON_SCHEDULE,
+    cronTimezone: CRON_TIMEZONE,
+  });
+} else if (!CRON_ENABLED) {
+  log('Cron disabled via CRON_ENABLED=false', {
+    cronSchedule: CRON_SCHEDULE,
+    cronTimezone: CRON_TIMEZONE,
+  });
+} else {
+  log('Registering scheduled cron job', {
+    cronSchedule: CRON_SCHEDULE,
+    cronTimezone: CRON_TIMEZONE,
+  });
+
+  cron.schedule(
+    CRON_SCHEDULE,
+    async () => {
+      if (isCronRunning) {
+        log('Scheduled cron tick skipped (previous run still in progress)');
+        return;
+      }
+
+      isCronRunning = true;
+      const startedAt = Date.now();
+      log('Scheduled cron job triggered');
+
+      try {
+        await performCronTask();
+        log('Scheduled cron job completed', { durationMs: Date.now() - startedAt });
+      } catch (error) {
+        console.error('Error in scheduled cron job:', error);
+        log('Scheduled cron job failed', {
+          durationMs: Date.now() - startedAt,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      } finally {
+        isCronRunning = false;
+      }
+    },
+    { timezone: CRON_TIMEZONE },
+  );
+}
 
 app.get('/health', (_: Request, res: Response) => {
   res.json({
     status: 'ok', 
     timestamp: new Date().toISOString(),
     cronSchedule: CRON_SCHEDULE,
-    cronTimezone: CRON_TIMEZONE
+    cronTimezone: CRON_TIMEZONE,
+    cronEnabled: CRON_ENABLED,
+    cronIsRunning: isCronRunning,
+    uptimeSeconds: Math.floor(process.uptime()),
   });
 });
 
@@ -182,6 +246,20 @@ const server = app.listen(PORT, () => {
   console.log(`Cron schedule: ${CRON_SCHEDULE}`);
   console.log(`Cron timezone: ${CRON_TIMEZONE}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
+  log('Process unhandledRejection', {
+    reason: reason instanceof Error ? reason.message : String(reason),
+  });
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  log('Process uncaughtException', {
+    error: error.message,
+  });
 });
 
 process.on('SIGTERM', async () => {
