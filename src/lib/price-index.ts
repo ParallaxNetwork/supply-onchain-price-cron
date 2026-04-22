@@ -1,4 +1,5 @@
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import { db } from "../server/db";
 import type { MarketData } from "@prisma/client";
 import {
@@ -6,6 +7,8 @@ import {
   updateAllShelterCCR,
   updateAllWarehouseCCR,
 } from "./ccr";
+
+puppeteer.use(StealthPlugin());
 
 /* ---------------------------------------
    CONSTANTS
@@ -91,22 +94,39 @@ export class PriceIndexService {
    * Reusable Puppeteer logic to fetch Barchart JSON data
    */
   private async _fetchBarchartData(targetUrl: string): Promise<BarchartRaw | null> {
+    const proxyUrl = process.env.HTTP_PROXY_URL;
+    const launchArgs = [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+    ];
+
+    let proxyAuth: { username: string; password: string } | null = null;
+    if (proxyUrl) {
+      const parsed = new URL(proxyUrl);
+      launchArgs.push(`--proxy-server=${parsed.protocol}//${parsed.host}`);
+      if (parsed.username) {
+        proxyAuth = {
+          username: decodeURIComponent(parsed.username),
+          password: decodeURIComponent(parsed.password),
+        };
+      }
+    }
+
     const browser = await puppeteer.launch({
       headless: true,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH ??
                       (process.env.NODE_ENV === 'production' ? '/usr/bin/chromium' : undefined),
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--no-zygote",
-        "--single-process",
-      ],
+      args: launchArgs,
     });
 
     try {
       const page = await browser.newPage();
+
+      if (proxyAuth) {
+        await page.authenticate(proxyAuth);
+      }
 
       await page.setExtraHTTPHeaders({
         "Accept-Language": "en-US,en;q=0.9",
@@ -136,10 +156,15 @@ export class PriceIndexService {
         }
       });
 
-      await page.goto(targetUrl, {
+      const response = await page.goto(targetUrl, {
         waitUntil: "networkidle2",
         timeout: 60000,
       });
+
+      const status = response?.status();
+      if (status && status >= 400) {
+        throw new Error(`❌ Barchart returned HTTP ${status} for ${targetUrl} — likely IP/CDN block.`);
+      }
 
       const headerText = await page.$eval('h1', (el) => el.innerText);
 
@@ -147,7 +172,7 @@ export class PriceIndexService {
       const match = /\(((?:RM|KC)[A-Z0-9]+)\)/.exec(headerText);
 
       if (!match?.[1]) {
-        throw new Error(`❌ Could not extract active symbol from header text: "${headerText}"`);
+        throw new Error(`❌ Could not extract active symbol from header text: "${headerText}" (HTTP ${status ?? 'unknown'})`);
       }
 
       const activeSymbol = match[1]; // e.g., "RMH26"
