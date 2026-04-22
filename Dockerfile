@@ -1,8 +1,9 @@
 FROM node:20-slim
 
-# Install Chromium and its dependencies
+# Install Chromium, its dependencies, and dumb-init (PID 1 reaper for zombie cleanup)
 RUN apt-get update && apt-get install -y \
     chromium \
+    dumb-init \
     fonts-liberation \
     fonts-noto-cjk \
     libasound2 \
@@ -27,7 +28,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Tell Puppeteer to use the installed Chromium instead of downloading its own
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 WORKDIR /app
@@ -53,4 +54,5 @@ RUN mkdir -p logs
 
 EXPOSE 3000
 
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 CMD ["node", "dist/index.js"]

@@ -93,13 +93,15 @@ export class PriceIndexService {
   private async _fetchBarchartData(targetUrl: string): Promise<BarchartRaw | null> {
     const browser = await puppeteer.launch({
       headless: true,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH ?? 
-                      (process.env.NODE_ENV === 'production' ? '/usr/bin/chromium-browser' : undefined),
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH ??
+                      (process.env.NODE_ENV === 'production' ? '/usr/bin/chromium' : undefined),
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
         "--disable-gpu",
+        "--no-zygote",
+        "--single-process",
       ],
     });
 
